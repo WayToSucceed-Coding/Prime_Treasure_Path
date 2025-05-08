@@ -1,0 +1,1193 @@
+class StartScene extends Phaser.Scene {
+    constructor() {
+        super('StartScene');
+    }
+
+    preload() {
+        // Preload assets for start screen
+        this.load.image('startBg', 'assets/texture5.png');
+        this.load.image('startExplorer', 'assets/player.png');
+        this.load.image('startTreasure', 'assets/gem.png');
+        this.load.image('startTile', 'assets/stone2.png');
+    }
+
+    create() {
+        // Create background with same water texture as game
+        this.bg = this.add.tileSprite(0, 0, 800, 700, 'startBg')
+            .setOrigin(0)
+            .setAlpha(0.8);
+
+        // Title with adventure-style font
+        const title = this.add.text(400, 150, 'PRIME PATH TREASURE', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '48px',
+            color: '#FFFFFF',
+            strokeThickness: 2,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#000',
+                blur: 3,
+                stroke: true
+            }
+        }).setOrigin(0.5);
+
+        // Subtitle
+        const subtitle = this.add.text(400, 210, 'Follow the Path of Primes', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '24px',
+            color: '#FFF',
+           
+        }).setOrigin(0.5);
+
+        // Game explanation
+        const explanation = this.add.text(400, 300, 
+            `Reach the treasure by following a path where each step is a prime number.\n` +
+            `Use arrow keys to move.\n Make sure to avoid non-prime numbers!\n` , 
+            {
+                fontFamily: 'Arial',
+                fontSize: '18px',
+                color: '#EEE',
+                align: 'center',
+                lineSpacing: 10
+            }).setOrigin(0.5);
+
+
+        // Play button 
+        const playButton = this.add.rectangle(400, 400, 200, 60, 0xFA8072)
+            .setInteractive()
+            .setStrokeStyle(4, 0xFFFFFF);
+        
+        const playText = this.add.text(400, 400, 'PLAY', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '24px',
+            color: '#FFFFFF'
+        }).setOrigin(0.5);
+
+        // Button hover effects
+        playButton.on('pointerover', () => {
+            playButton.setFillStyle(0xFF7F50);
+            playText.setScale(1.05);
+        });
+
+        playButton.on('pointerout', () => {
+            playButton.setFillStyle(0xFA8072);
+            playText.setScale(1);
+        });
+
+        // Start game on click
+        playButton.on('pointerdown', () => {
+            this.scene.start('GameScene');
+        });
+
+        // Add explorer character
+        this.explorer = this.add.image(200, 400, 'startExplorer')
+            .setScale(1)
+            .setFlipX(true);
+
+        // Add treasure
+        this.treasure = this.add.image(600, 400, 'startTreasure')
+            .setScale(1.5);
+
+        // Animate elements
+        this.tweens.add({
+            targets: this.explorer,
+            y: 380,
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.inOut'
+        });
+
+        this.tweens.add({
+            targets: this.treasure,
+            angle: 360,
+            duration: 10000,
+            repeat: -1
+        });
+
+        // Pulsing title effect
+        this.tweens.add({
+            targets: title,
+            scale: 1.05,
+            duration: 1500,
+            yoyo: true,
+            repeat: -1
+        });
+    }
+
+    createExampleTiles() {
+        // Create example prime path
+        const primes = [2, 3, 5, 7, 11, 13, 17, 19];
+        const xStart = 300;
+        const yStart = 350;
+        const tileSize = 40;
+        const spacing = 45;
+        
+        for (let i = 0; i < primes.length; i++) {
+            const x = xStart + (i % 4) * spacing;
+            const y = yStart + Math.floor(i / 4) * spacing;
+            
+            // Create tile
+            const tile = this.add.image(x, y, 'startTile')
+                .setDisplaySize(tileSize, tileSize);
+            
+            // Add number
+            this.add.text(x, y, primes[i].toString(), {
+                font: 'bold 16px Arial',
+                color: '#FFF',
+                stroke: '#000',
+                strokeThickness: 2
+            }).setOrigin(0.5);
+            
+            // // Add arrow if not last
+            // if (i < primes.length - 1) {
+            //     const nextX = xStart + ((i + 1) % 4) * spacing;
+            //     const nextY = yStart + Math.floor((i + 1) / 4) * spacing;
+                
+            //     this.add.line(x, y, 
+            //         tileSize/2 - 5, 0, 
+            //         spacing - tileSize/2 + 5, nextY - y, 
+            //         0xFFFFFF, 0.7)
+            //         .setOrigin(0);
+            // }
+        }
+    }
+}
+
+// Main game scene
+class GameScene extends Phaser.Scene {
+    constructor() {
+        super('GameScene');
+        this.score = 0;
+        this.highScore = 0;
+    }
+
+    preload() {
+        // Load assets with enhanced visuals
+        this.load.image('waterTexture', 'assets/texture5.png');
+        this.load.image('tile', 'assets/stone2.png');
+        this.load.image('explorer', 'assets/player.png');
+        this.load.image('treasure', 'assets/gem.png');
+        this.load.image('particle', 'assets/gem.png');
+        this.load.audio('collect', 'assets/pop.mp3');
+        this.load.audio('error', 'assets/error.mp3');
+        this.load.audio('win', 'assets/win.mp3');
+
+    }
+
+    create() {
+        // Game state
+        this.selectedPath = [];
+        this.usedNumbers = new Set();
+        this.gridSize = 8;
+        this.tileSize = 80;
+        this.isMoving = false;
+        this.scoredTiles = new Set();
+
+
+        // Calculate center offset for the grid
+        const gridWidth = this.gridSize * this.tileSize;
+        const gridHeight = this.gridSize * this.tileSize;
+        this.gridOffsetX = (this.sys.game.config.width - gridWidth) / 2;
+        this.gridOffsetY = (this.sys.game.config.height - gridHeight) / 2 + 20; // +50 to account for UI
+
+        // Retrieve high score from local storage if available
+        const savedHighScore = localStorage.getItem('primePathHighScore');
+        if (savedHighScore) {
+            this.highScore = parseInt(savedHighScore);
+        }
+
+        // Reset score for new game
+        this.score = 0;
+
+        // Generate grid with unique numbers
+        this.grid = this.generateUniqueNumberGrid();
+
+        // Create graphics for trail effects
+        this.trailGraphics = this.add.graphics();
+        this.pathGraphics = this.add.graphics();
+
+        // Create particle emitter for trail
+        this.particles = this.add.particles('particle');
+
+        this.trailEmitter = this.particles.createEmitter({
+            speed: 0,
+            scale: { start: 0.2, end: 0 },
+            blendMode: 'ADD',
+            lifespan: 1000,
+            frequency: -1, // Manual emission
+            tint: 0x88ff88
+        });
+
+        // Create and store grid tiles
+        this.tiles = [];
+        for (let y = 0; y < this.gridSize; y++) {
+            this.tiles[y] = [];
+            for (let x = 0; x < this.gridSize; x++) {
+                const tileX = this.gridOffsetX + x * this.tileSize + this.tileSize / 2;
+                const tileY = this.gridOffsetY + y * this.tileSize + this.tileSize / 2;
+
+                // Create container for tile and effects
+                const tileContainer = this.add.container(tileX, tileY);
+
+
+                // Add glow effect (hidden by default)
+                const glow = this.add.graphics();
+                glow.fillStyle(0xffff44, 0.3);
+                glow.fillCircle(0, 0, this.tileSize / 2 + 4);
+                glow.alpha = 0;
+                tileContainer.add(glow);
+
+                // Add main tile
+                const tile = this.add.image(0, 0, 'tile')
+                    .setDisplaySize(this.tileSize - 4, this.tileSize - 4)
+                    .setInteractive()
+
+
+                tileContainer.add(tile);
+
+                // Add number text
+                const text = this.add.text(
+                    0, 0,
+                    this.grid[y][x].value.toString(),
+                    {
+                        font: 'bold 20px Arial',
+                        fill: '#FFFFFF',
+                        align: 'center'
+                    }
+                ).setOrigin(0.5);
+                tileContainer.add(text);
+
+                // Store references
+                this.tiles[y][x] = {
+                    container: tileContainer,
+                    tile: tile,
+                    text: text,
+                    glow: glow,
+                    x: x,
+                    y: y
+                };
+
+            }
+        }
+
+
+        this.tiles.forEach(row => {
+            row.forEach(tile => {
+                // Store original position
+                tile.originalY = tile.container.y;
+                // Wobble properties (slow speed, small height)
+                tile.wobble = {
+                    speed: 0.5 + Math.random() * 0.5,  // Very slow
+                    offset: Math.random() * 100,       // Random start point
+                    height: 0.6 + Math.random() * 0.8  // Small movement
+                };
+            });
+        });
+
+        // Arrow key movement
+        this.cursors = this.input.keyboard.createCursorKeys();
+
+        // Track movement cooldown to prevent spamming
+        this.moveCooldown = false;
+
+        // Create player with trailing particles
+        this.player = this.add.sprite(
+            this.tileSize / 2 + this.gridOffsetX,
+            this.tileSize / 2 + this.gridOffsetY,
+            'explorer'
+        ).setDisplaySize(80, 80);
+
+        // Player particle trail
+        this.playerEmitter = this.particles.createEmitter({
+            follow: this.player,
+            speed: { min: 10, max: 30 },
+            scale: { start: 0.1, end: 0 },
+            alpha: { start: 0.6, end: 0 },
+            lifespan: 800,
+            blendMode: 'ADD',
+            frequency: 40,
+            tint: [0xffff00, 0x88ff88, 0x44aaff]
+        });
+
+        // Add treasure
+        this.treasure = this.add.image(
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetY,
+            'treasure'
+        ).setDisplaySize(50, 50);
+
+        // Add glow effect to treasure
+        this.treasureGlow = this.add.graphics();
+        this.treasureGlow.fillStyle(0xffff44, 0.3);
+        this.treasureGlow.fillCircle(
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetY,
+            this.tileSize / 2
+        );
+
+        // Pulsing effect for treasure
+        this.tweens.add({
+            targets: this.treasureGlow,
+            alpha: 0.1,
+            duration: 1200,
+            yoyo: true,
+            repeat: -1
+        });
+
+        // Rotate treasure
+        this.tweens.add({
+            targets: this.treasure,
+            angle: 360,
+            duration: 6000,
+            repeat: -1
+        });
+
+        this.designSystem = {
+           
+            typography: {
+                display: "'Playfair Display', serif", // Elegant serif
+                heading: "'Cormorant Garamond', serif", // Refined serif
+                body: "'Lora', serif", // Readable serif
+                ui: "'Montserrat', sans-serif" // Clean sans for UI
+            }
+        };
+
+        // Score text with letter-spacing
+        this.scoreText = this.add.text(20, 15, `SCORE : ${this.score}`, {
+            fontFamily: this.designSystem.typography.ui,
+            fontSize: '25px',
+            color: '#FFFFFF',
+            fontStyle: 'bold',
+            letterSpacing: 3,
+
+        });
+
+        // High score
+        this.highScoreText = this.add.text(500, 15, `HIGH SCORE : ${this.highScore}`, {
+            fontFamily: this.designSystem.typography.ui,
+            fontSize: '25px',
+            color: '#FFFFFF',
+            letterSpacing: 2,
+            fontStyle: 'bold'
+
+        });
+
+
+        this.water = this.add.tileSprite(
+            0, 0,                // Position
+            800, 600,            // Game size (will tile automatically)
+            'waterTexture'       // Your texture
+        )
+            .setOrigin(0)
+            .setDepth(-1);
+
+
+
+
+    }
+    update(time) {
+        if (this.isMoving || this.moveCooldown) return;
+
+
+
+        const lastPos = this.selectedPath.length > 0 ?
+            this.selectedPath[this.selectedPath.length - 1] :
+            { x: 0, y: 0 };
+
+        let targetX = lastPos.x;
+        let targetY = lastPos.y;
+
+        if (this.cursors.left.isDown && lastPos.x > 0) {
+            targetX--;
+        }
+        else if (this.cursors.right.isDown && lastPos.x < this.gridSize - 1) {
+            targetX++;
+        }
+        else if (this.cursors.up.isDown && lastPos.y > 0) {
+            targetY--;
+        }
+        else if (this.cursors.down.isDown && lastPos.y < this.gridSize - 1) {
+            targetY++;
+        }
+
+        // If position changed, handle movement
+        if (targetX !== lastPos.x || targetY !== lastPos.y) {
+            this.moveCooldown = true;
+            this.handleTileClick(targetX, targetY);
+
+            // Add slight delay before next move
+            this.time.delayedCall(200, () => {
+                this.moveCooldown = false;
+            });
+        }
+
+        // Gentle wobble animation
+        this.tiles.forEach(row => {
+            row.forEach(tile => {
+                tile.container.y = tile.originalY +
+                    Math.sin((time + tile.wobble.offset) * 0.002 * tile.wobble.speed) * tile.wobble.height;
+            });
+        });
+    }
+
+
+    generateUniqueNumberGrid() {
+        const grid = [];
+        this.usedNumbers.clear();
+
+        // Generate primes (2-100) and non-primes
+        const primes = [];
+        const nonPrimes = [];
+
+        for (let i = 2; i <= 100; i++) {
+            if (this.isPrime(i)) primes.push(i);
+            else nonPrimes.push(i);
+        }
+
+        // Shuffle arrays
+        Phaser.Utils.Array.Shuffle(primes);
+        Phaser.Utils.Array.Shuffle(nonPrimes);
+
+        // Create guaranteed path first
+        let x = 0, y = 0;
+        const path = [];
+
+        while (x < this.gridSize - 1 || y < this.gridSize - 1) {
+            path.push({ x, y });
+
+            // Randomly move right or down
+            const canMoveRight = x < this.gridSize - 1;
+            const canMoveDown = y < this.gridSize - 1;
+
+            if (canMoveRight && (!canMoveDown || Math.random() > 0.5)) {
+                x++;
+            } else {
+                y++;
+            }
+        }
+        path.push({ x, y }); // Add end point
+
+        // Initialize empty grid
+        for (let y = 0; y < this.gridSize; y++) {
+            grid[y] = [];
+            for (let x = 0; x < this.gridSize; x++) {
+                grid[y][x] = { value: 0, isPrime: false };
+            }
+        }
+
+        // Assign primes to path
+        path.forEach((pos, index) => {
+            grid[pos.y][pos.x] = {
+                value: primes.pop(),
+                isPrime: true
+            };
+            this.usedNumbers.add(grid[pos.y][pos.x].value);
+        });
+
+        // Fill remaining tiles
+        for (let y = 0; y < this.gridSize; y++) {
+            for (let x = 0; x < this.gridSize; x++) {
+                if (grid[y][x].value === 0) {
+                    // 40% chance to be prime
+                    if (Math.random() < 0.4 && primes.length > 0) {
+                        grid[y][x] = {
+                            value: primes.pop(),
+                            isPrime: true
+                        };
+                    } else {
+                        grid[y][x] = {
+                            value: nonPrimes.pop(),
+                            isPrime: false
+                        };
+                    }
+                    this.usedNumbers.add(grid[y][x].value);
+                }
+            }
+        }
+
+        return grid;
+    }
+
+    handleTileClick(x, y) {
+        const tile = this.grid[y][x];
+
+        // Create a unique key for the tile position
+        const tileKey = `${x},${y}`;
+
+        if (tile.isPrime) {
+            this.selectedPath.push({ x, y });
+            this.drawTrail();
+            this.movePlayerTo(x, y);
+
+            // Highlight the selected tile
+            this.highlightTile(x, y, true);
+
+
+            // Only add points if this tile hasn't been scored before
+            if (!this.scoredTiles.has(tileKey)) {
+                const primeValue = tile.value;
+            
+                // const pointsEarned = this.calculatePoints(primeValue);
+                const pointsEarned = tile.value
+                this.score += pointsEarned;
+
+                this.sound.play('collect', { volume: 0.8 });
+
+                // Show points earned popup
+                this.showPointsEarned(x, y, pointsEarned);
+
+                // Mark this tile as scored
+                this.scoredTiles.add(tileKey);
+            }
+
+            // Update score display
+            this.updateScoreDisplay();
+
+            // Check win condition
+            if (x === this.gridSize - 1 && y === this.gridSize - 1) {
+                // Add completion bonus
+                const completionBonus = 500;
+                this.score += completionBonus;
+
+                // Check if this is a new high score
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('primePathHighScore', this.highScore);
+                    this.updateScoreDisplay();
+                }
+
+                this.time.delayedCall(500, () => {
+                    this.celebrateWin();
+                    this.time.delayedCall(1500, () => {
+                        this.scene.start('WinScene', {
+                            score: this.score,
+                            highScore: this.highScore,
+                            isNewHighScore: this.score === this.highScore
+                        });
+                    });
+                });
+            }
+        } else {
+            // Show error and reset
+            this.showError(x, y, tile.value);
+            this.sound.play('error', { volume: 0.8 });
+            this.resetPlayer();
+        }
+    }
+    movePlayerTo(x, y) {
+        this.isMoving = true;
+
+        const lastPos = this.selectedPath.length > 1 ?
+            this.selectedPath[this.selectedPath.length - 2] :
+            { x: 0, y: 0 };
+
+        const startX = lastPos.x * this.tileSize + this.tileSize / 2 + this.gridOffsetX;
+        const startY = lastPos.y * this.tileSize + this.tileSize / 2 + this.gridOffsetY;
+        const endX = x * this.tileSize + this.tileSize / 2 + this.gridOffsetX;
+        const endY = y * this.tileSize + this.tileSize / 2 + this.gridOffsetY;
+
+        // Jump height (adjust as needed)
+        const jumpHeight = 20;
+
+        // Create jump animation timeline
+        const timeline = this.tweens.createTimeline();
+
+        // 1. Jump up
+        timeline.add({
+            targets: this.player,
+            y: endY - jumpHeight,
+            duration: 150,
+            ease: 'Sine.easeOut'
+        });
+
+        // 2. Land down with tile vibration
+        timeline.add({
+            targets: this.player,
+            y: endY,
+            duration: 100,
+            ease: 'Bounce.easeOut',
+            onStart: () => {
+                // Vibrate the landed tile
+                this.vibrateTile(x, y);
+            },
+            onComplete: () => {
+                this.isMoving = false;
+            }
+        });
+
+        // Horizontal movement happens during the entire jump
+        this.tweens.add({
+            targets: this.player,
+            x: endX,
+            duration: 250, // Total jump duration
+            ease: 'Linear'
+        });
+
+        timeline.play();
+    }
+
+    vibrateTile(x, y) {
+        const tileContainer = this.tiles[y][x].container;
+
+        // Store original position if not already stored
+        if (!tileContainer.originalY) {
+            tileContainer.originalY = tileContainer.y;
+        }
+
+        // Gentle dip and bounce effect
+        this.tweens.add({
+            targets: tileContainer,
+            y: tileContainer.originalY + 3, // Slight downward dip
+            duration: 80,
+            yoyo: true, // Makes it bounce back
+            ease: 'Quad.easeOut',
+            onComplete: () => {
+                // Ensure it returns exactly to original position
+                tileContainer.y = tileContainer.originalY;
+            }
+        });
+
+        // Optional: Very subtle horizontal movement (comment out if too much)
+        this.tweens.add({
+            targets: tileContainer,
+            x: tileContainer.x + Phaser.Math.Between(-1, 1), // Tiny horizontal variation
+            duration: 100,
+            yoyo: true,
+            ease: 'Sine.easeInOut'
+        });
+    }
+
+    drawTrail() {
+        this.trailGraphics.clear();
+
+        if (this.selectedPath.length <= 1) return;
+
+        // Create gradient trail
+        const colors = [
+            0xff88ff,   // Light pink
+            0xff00ff,   // Magenta
+            0xaa00ff,   // Purple
+            0x8800ff    // Deep purple
+        ];
+
+        for (let i = 1; i < this.selectedPath.length; i++) {
+            const prev = this.selectedPath[i - 1];
+            const curr = this.selectedPath[i];
+
+            const prevX = prev.x * this.tileSize + this.tileSize / 2 + this.gridOffsetX;
+            const prevY = prev.y * this.tileSize + this.tileSize / 2 + this.gridOffsetY;
+            const currX = curr.x * this.tileSize + this.tileSize / 2 + this.gridOffsetX;
+            const currY = curr.y * this.tileSize + this.tileSize / 2 + this.gridOffsetY;
+
+            // Calculate gradient color based on path position
+            const pathProgress = (i - 1) / (this.selectedPath.length - 1);
+            const colorIndex = Math.min(Math.floor(pathProgress * colors.length), colors.length - 1);
+            const color = colors[colorIndex];
+
+            // Draw line with glow effect
+            this.trailGraphics.lineStyle(6, color, 0.3);
+            this.trailGraphics.strokeLineShape(new Phaser.Geom.Line(prevX, prevY, currX, currY));
+            this.trailGraphics.setDepth(-1); // Ensure it's behind the player
+            // Draw inner line (brighter)
+            this.trailGraphics.lineStyle(2, 0xffffff, 0.3);
+            this.trailGraphics.strokeLineShape(new Phaser.Geom.Line(prevX, prevY, currX, currY));
+            this.trailGraphics.setDepth(-1)
+        }
+    }
+
+    highlightTile(x, y, isPrime) {
+        const tileDef = this.tiles[y][x];
+
+        // Reset all previous highlighting except for path
+        this.tiles.forEach(row => {
+            row.forEach(t => {
+                if (!this.isInPath(t.x, t.y)) {
+                    t.glow.alpha = 0;
+                    t.tile.setTint(0xffffff);
+                }
+            });
+        });
+
+        // Highlight the current tile
+        if (isPrime) {
+            // Show glow effect
+            tileDef.glow.clear();
+            tileDef.glow.fillStyle( 0xfff9e6, 0.4);
+            tileDef.glow.fillCircle(0, 0, this.tileSize / 2 + 4);
+            tileDef.glow.alpha = 1;
+
+            // Tint the tile
+            tileDef.tile.setTint(0xccffcc);
+
+            // Create a small flash effect
+            this.tweens.add({
+                targets: tileDef.glow,
+                alpha: 0.3,
+                duration: 100,
+                yoyo: true,
+                repeat: 0
+            });
+
+            // Emit particles at tile
+            this.time.addEvent({
+                delay: 10,
+                repeat: 10,
+                callback: () => {
+                    this.trailEmitter.setPosition(
+                        x * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+                        y * this.tileSize + this.tileSize / 2 + this.gridOffsetY
+                    );
+                    this.trailEmitter.emitParticle(3);
+                }
+            });
+        }
+    }
+
+    isInPath(x, y) {
+        return this.selectedPath.some(pos => pos.x === x && pos.y === y);
+    }
+
+    showError(x, y, num) {
+        let explanation = `${num} is not prime. `;
+
+        if (num === 1) {
+            explanation += "1 is not a prime number.";
+        } else {
+            for (let i = 2; i <= Math.sqrt(num); i++) {
+                if (num % i === 0) {
+                    explanation += `Divisible by ${i}.`;
+                    break;
+                }
+            }
+        }
+
+        const errorText = this.add.text(
+            x * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            y * this.tileSize - 20 + this.gridOffsetY,
+            explanation,
+            {
+                font: '14px Arial',
+                fill: '#ff0000',
+                backgroundColor: '#fff0f0',
+                align: 'center',
+                padding: { x: 10, y: 10 },
+                
+            }
+        ).setOrigin(0.5);
+
+        // Flash the incorrect tile with red color
+        const tileDef = this.tiles[y][x];
+
+        // Red glow effect
+        tileDef.glow.clear();
+        tileDef.glow.fillStyle(0xff4444, 0.6);
+        tileDef.glow.fillCircle(0, 0, this.tileSize / 2 + 4);
+        tileDef.glow.alpha = 1;
+
+        // Tint the tile red
+        tileDef.tile.setTint(0xff8888);
+
+        // Create shake effect
+        this.tweens.add({
+            targets: tileDef.container,
+            x: tileDef.container.x + 3,
+            duration: 1000,
+            yoyo: true,
+            repeat: 5
+        });
+
+        // Create red particles
+        const errorEmitter = this.particles.createEmitter({
+            x: x * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            y: y * this.tileSize + this.tileSize / 2 + this.gridOffsetY,
+            speed: { min: 50, max: 100 },
+            scale: { start: 0.1, end: 0 },
+            alpha: { start: 0.6, end: 0 },
+            lifespan: 800,
+            blendMode: 'ADD',
+            tint: 0xff0000,
+            quantity: 20
+        });
+
+        // Cleanup
+        this.time.delayedCall(1000, () => {
+            errorText.destroy();
+            errorEmitter.stop();
+            tileDef.glow.alpha = 0;
+            tileDef.tile.clearTint();
+        });
+    }
+
+    resetPlayer() {
+        this.isMoving = true;
+        this.scoredTiles.clear();
+
+        // Create tween to return to start
+        this.tweens.add({
+            targets: this.player,
+            x: this.tileSize / 2 + this.gridOffsetX,
+            y: this.tileSize / 2 + this.gridOffsetY,
+            duration: 300,
+            ease: 'Bounce.out',
+            onComplete: () => {
+                this.isMoving = false;
+                // Reset ALL tile visuals including glow
+                this.tiles.forEach(row => {
+                    row.forEach(tileDef => {
+                        tileDef.glow.alpha = 0;  // Clear glow
+                        tileDef.tile.clearTint(); // Clear tint
+                        tileDef.container.y = tileDef.originalY; // Reset position if needed
+                    });
+                });
+            }
+        });
+
+        // Reset tile visuals
+        this.tiles.forEach(row => {
+            row.forEach(tileDef => {
+                tileDef.glow.alpha = 0;
+                tileDef.tile.clearTint();
+            });
+        });
+
+        // Fade out trail
+        this.tweens.add({
+            targets: this.trailGraphics,
+            alpha: 0,
+            duration: 500,
+            onComplete: () => {
+                this.trailGraphics.clear();
+                this.trailGraphics.alpha = 1;
+            }
+        });
+
+        // Reset path and score
+        this.selectedPath = [];
+        this.score = 0;
+        this.updateScoreDisplay();
+    }
+
+    celebrateWin() {
+
+        this.sound.play('win',{volume:0.8});
+        // Create explosion of particles at treasure
+        const winEmitter = this.particles.createEmitter({
+            x: (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            y: (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetY,
+            speed: { min: 50, max: 200 },
+            scale: { start: 0.3, end: 0 },
+            alpha: { start: 0.8, end: 0 },
+            lifespan: 1500,
+            blendMode: 'ADD',
+            tint: [0xffff00, 0x88ff88, 0xff88ff, 0x88ffff],
+            quantity: 50
+        });
+
+        // Make treasure pulse
+        this.tweens.add({
+            targets: this.treasure,
+            scale: 1.5,
+            duration: 300,
+            yoyo: true,
+            repeat: 3
+        });
+
+        // Enhanced glow effect on treasure
+        this.treasureGlow.clear();
+        this.treasureGlow.fillStyle(0xffff44, 0.8);
+        this.treasureGlow.fillCircle(
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2+this.gridOffsetX,
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2+this.gridOffsetY,
+            this.tileSize
+        );
+
+        // Fade out treasure glow
+        this.tweens.add({
+            targets: this.treasureGlow,
+            alpha: 0,
+            duration: 1500
+        });
+
+        // Stop emitter after celebration
+        this.time.delayedCall(1500, () => {
+            winEmitter.stop();
+        });
+    }
+
+    updateScoreDisplay() {
+        this.scoreText.setText(`SCORE :  ${this.score}`);
+        this.highScoreText.setText(`HIGH SCORE : ${this.highScore}`);
+
+        // Animate score text
+        this.tweens.add({
+            targets: this.scoreText,
+            scale: 1.2,
+            duration: 100,
+            yoyo: true
+        });
+    }
+
+    // calculatePoints(primeValue) {
+    //     // Base points for finding any prime
+    //     let points = 10;
+
+    //     // Bonus points based on prime value
+    //     points += Math.floor(primeValue / 3);
+
+    //     // Bonus for larger primes
+    //     if (primeValue > 50) points += 15;
+    //     if (primeValue > 70) points += 20;
+    //     if (primeValue > 90) points += 25;
+
+    //     // Combo bonus for consecutive primes
+    //     points += Math.min(this.selectedPath.length * 2, 50);
+
+    //     return points;
+    // }
+
+    showPointsEarned(x, y, points) {
+        // Create floating points text
+        const pointsText = this.add.text(
+            x * this.tileSize + this.tileSize / 2,
+            y * this.tileSize + this.tileSize / 2 - 10,
+            `+${points}`,
+            {
+                font: 'bold 24px Arial',
+                fill: '#ffffff',
+                stroke: '#333333',
+                strokeThickness: 3
+            }
+        ).setOrigin(0.5);
+
+        // Animate points text floating up and fading
+        this.tweens.add({
+            targets: pointsText,
+            y: pointsText.y - 40,
+            alpha: 0,
+            scale: 1.5,
+            duration: 1000,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+                pointsText.destroy();
+            }
+        });
+
+        // Create sparkle particles for points
+        const pointsEmitter = this.particles.createEmitter({
+            x: x * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            y: y * this.tileSize + this.tileSize / 2 + this.gridOffsetY,
+            speed: { min: 30, max: 70 },
+            scale: { start: 0.1, end: 0 },
+            alpha: { start: 0.8, end: 0 },
+            lifespan: 800,
+            blendMode: 'ADD',
+            tint: 0xffff00,
+            quantity: Math.min(points / 5, 10)
+        });
+
+        // Stop emitter after animation
+        this.time.delayedCall(500, () => {
+            pointsEmitter.stop();
+        });
+    }
+
+    isPrime(num) {
+        for (let i = 2, s = Math.sqrt(num); i <= s; i++)
+            if (num % i === 0) return false;
+        return num > 1;
+    }
+}
+
+class WinScene extends Phaser.Scene {
+    constructor() {
+        super('WinScene');
+    }
+
+    init(data) {
+        this.score = data.score || 0;
+        this.highScore = data.highScore || 0;
+        this.isNewHighScore = data.isNewHighScore || false;
+    }
+
+    preload() {
+        this.load.image('particle', 'assets/gem.png');
+        this.load.image('medal', 'assets/gem.png');
+        this.load.image('winBg', 'assets/texture5.png');
+    }
+
+    create() {
+        // Create background with same water texture
+        this.bg = this.add.tileSprite(0, 0, 800, 700, 'winBg')
+            .setOrigin(0)
+            .setAlpha(0.7);
+
+        // Create parchment-style background
+        const parchment = this.add.graphics()
+            .fillStyle(0xFFF8DC, 0.1)
+            .fillRoundedRect(100, 80, 600, 500, 20)
+            // .setStrokeStyle(4, 0x8B4513)
+            .strokeRoundedRect(100, 80, 600, 500, 20);
+
+        // Title with adventure-style font
+        const winTitle = this.add.text(400, 150, 'TREASURE ACQUIRED!', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '42px',
+            color: '#FFFFFF',
+            strokeThickness: 2,
+            shadow: {
+                offsetX: 2,
+                offsetY: 2,
+                color: '#000',
+                blur: 3,
+                stroke: true
+            }
+        }).setOrigin(0.5);
+
+        // Score display on parchment
+        const scoreTitle = this.add.text(400, 290, `Your Score : ${this.score}`, {
+            fontFamily: 'Georgia, serif',
+            fontSize: '40px',
+            color: '#FFFFFF',
+            strokeThickness: 1,
+        }).setOrigin(0.5);
+
+        // Animate score counting up
+        let displayScore = 0;
+        const scoreCountInterval = setInterval(() => {
+            displayScore = Math.min(displayScore + Math.ceil(this.score / 20), this.score);
+            scoreText.setText(`${displayScore}`);
+
+            if (displayScore >= this.score) {
+                clearInterval(scoreCountInterval);
+                this.createCelebration(scoreText.x, scoreText.y);
+            }
+        }, 30);
+
+        // High score display
+        const highScoreText = this.add.text(400, 340, `Highest Score : ${this.highScore}`, {
+            fontFamily: 'Georgia, serif',
+            fontSize: '24px',
+            color: '#FFFFFF',
+            strokeThickness: 1
+           
+        }).setOrigin(0.5);
+
+        // New high score crown
+        if (this.isNewHighScore) {
+            const crown = this.add.image(520, 350, 'medal')
+                .setScale(0.5)
+                .setTint(0xFFD700);
+
+            this.add.text(400, 390, 'NEW RECORD!', {
+                fontFamily: 'Georgia, serif',
+                fontSize: '24px',
+                color: '#FF0000',
+                fontStyle: 'bold',
+               
+            }).setOrigin(0.5);
+
+            this.tweens.add({
+                targets: crown,
+                scale: 0.6,
+                duration: 800,
+                yoyo: true,
+                repeat: -1
+            });
+        }
+
+        // Play again button with treasure chest style
+        const playAgainButton = this.add.rectangle(400, 460, 200, 60, 0xFA8072)
+        .setInteractive()
+        .setStrokeStyle(4, 0xFFFFFF);
+
+        const playAgainText = this.add.text(400, 460, 'PLAY AGAIN', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '24px',
+            color: '#FFFFFF',
+            strokeThickness: 1
+        }).setOrigin(0.5);
+
+        // Button hover effects
+        playAgainButton.on('pointerover', () => {
+            playAgainButton.clear()
+                .fillStyle(0xFF7F50, 1)
+                .fillRoundedRect(300, 430, 200, 60, 10)
+                .strokeRoundedRect(300, 430, 200, 60, 10);
+            playAgainText.setScale(1.05);
+        });
+
+        playAgainButton.on('pointerout', () => {
+            playAgainButton.clear()
+                .fillStyle(0xFA8072, 1)
+                .fillRoundedRect(300, 430, 200, 60, 10)
+                .setStrokeStyle(4, 0xFFD700)
+                .strokeRoundedRect(300, 430, 200, 60, 10);
+            playAgainText.setScale(1);
+        });
+
+        playAgainButton.on('pointerdown', () => {
+            this.scene.start('GameScene');
+        });
+
+        // Add explorer and treasure graphics
+        const explorer = this.add.image(200, 450, 'explorer')
+            .setScale(0.8)
+            .setFlipX(true);
+
+        const treasure = this.add.image(600, 450, 'treasure')
+            .setScale(1.2);
+
+        // Animate elements
+        this.tweens.add({
+            targets: explorer,
+            x: 220,
+            duration: 2000,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.inOut'
+        });
+
+        this.tweens.add({
+            targets: treasure,
+            angle: 360,
+            duration: 10000,
+            repeat: -1
+        });
+    }
+
+    createCelebration(x, y) {
+        // Create particle emitter for celebration
+        const particles = this.add.particles('particle');
+        
+        const emitter = particles.createEmitter({
+            x: x,
+            y: y,
+            speed: { min: 50, max: 150 },
+            scale: { start: 0.3, end: 0 },
+            alpha: { start: 0.8, end: 0 },
+            lifespan: 1500,
+            blendMode: 'ADD',
+            tint: [0xFFD700, 0xFFA500, 0xFFFFFF],
+            frequency: 50,
+            quantity: 5
+        });
+
+        // Stop emitter after 3 seconds
+        this.time.delayedCall(3000, () => {
+            emitter.stop();
+        });
+    }
+}
+
+const config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 700,
+    backgroundColor: '#1a1a2e',
+    scene: [StartScene,GameScene,WinScene],
+    parent: 'game-container'
+};
+
+const game = new Phaser.Game(config);
