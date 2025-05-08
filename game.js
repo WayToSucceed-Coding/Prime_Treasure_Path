@@ -18,7 +18,7 @@ class StartScene extends Phaser.Scene {
             .setAlpha(0.8);
 
         // Title with adventure-style font
-        const title = this.add.text(400, 150, 'PRIME PATH TREASURE', {
+        const title = this.add.text(400, 150, 'PRIME TREASURE PATH', {
             fontFamily: 'Georgia, serif',
             fontSize: '48px',
             color: '#FFFFFF',
