@@ -1,3 +1,4 @@
+//Defines a new scene/screen in Phaser
 class StartScene extends Phaser.Scene {
     constructor() {
         super('StartScene');
@@ -13,11 +14,9 @@ class StartScene extends Phaser.Scene {
 
     create() {
         // Create background with same water texture as game
-        this.bg = this.add.tileSprite(0, 0, 800, 700, 'startBg')
-            .setOrigin(0)
-            .setAlpha(0.8);
+        this.bg = this.add.image(400, 350, 'startBg')
 
-        // Title with adventure-style font
+        // Adds text to the screen
         const title = this.add.text(400, 150, 'PRIME TREASURE PATH', {
             fontFamily: 'Georgia, serif',
             fontSize: '48px',
@@ -30,20 +29,21 @@ class StartScene extends Phaser.Scene {
                 blur: 3,
                 stroke: true
             }
-        }).setOrigin(0.5);
+        }).setOrigin(0.5);//Sets origin to the center of the text box
+        //setOrigin(x,y) defines the anchor point of an object
 
         // Subtitle
         const subtitle = this.add.text(400, 210, 'Follow the Path of Primes', {
             fontFamily: 'Georgia, serif',
             fontSize: '24px',
             color: '#FFF',
-           
+
         }).setOrigin(0.5);
 
         // Game explanation
-        const explanation = this.add.text(400, 300, 
+        const explanation = this.add.text(400, 300,
             `Reach the treasure by following a path where each step is a prime number.\n` +
-            `Use arrow keys to move.\n Make sure to avoid non-prime numbers!\n` , 
+            `Use arrow keys to move.\n Make sure to avoid non-prime numbers!\n`,
             {
                 fontFamily: 'Arial',
                 fontSize: '18px',
@@ -55,9 +55,11 @@ class StartScene extends Phaser.Scene {
 
         // Play button 
         const playButton = this.add.rectangle(400, 400, 200, 60, 0xFA8072)
-            .setInteractive()
+            .setInteractive()//Starts listening for mouse/touch events
             .setStrokeStyle(4, 0xFFFFFF);
-        
+
+        //setInteractive() can be called on a game object(like sprite,image,text,or shape)
+
         const playText = this.add.text(400, 400, 'PLAY', {
             fontFamily: 'Georgia, serif',
             fontSize: '24px',
@@ -83,7 +85,7 @@ class StartScene extends Phaser.Scene {
         // Add explorer character
         this.explorer = this.add.image(200, 400, 'startExplorer')
             .setScale(1)
-            .setFlipX(true);
+            .setFlipX(true);//Flips the image horizontally
 
         // Add treasure
         this.treasure = this.add.image(600, 400, 'startTreasure')
@@ -91,17 +93,17 @@ class StartScene extends Phaser.Scene {
 
         // Animate elements
         this.tweens.add({
-            targets: this.explorer,
-            y: 380,
-            duration: 2000,
-            yoyo: true,
-            repeat: -1,
-            ease: 'Sine.inOut'
+            targets: this.explorer,//The object to be animated
+            y: 380, //It will move the y position of the object to 380
+            duration: 2000, //The duration of the movement in milliseconds
+            yoyo: true, //Make it behave like a yo-yo by going back to its original position
+            repeat: -1, //To repeat the animation indefinitely
+            ease: 'Sine.inOut' //Makes the motion smooth and natural
         });
 
         this.tweens.add({
             targets: this.treasure,
-            angle: 360,
+            angle: 360, //Rotate the treasure 360 degrees
             duration: 10000,
             repeat: -1
         });
@@ -109,50 +111,13 @@ class StartScene extends Phaser.Scene {
         // Pulsing title effect
         this.tweens.add({
             targets: title,
-            scale: 1.05,
+            scale: 1.05, //Scale the title to 105% of its original size
             duration: 1500,
             yoyo: true,
             repeat: -1
         });
     }
 
-    createExampleTiles() {
-        // Create example prime path
-        const primes = [2, 3, 5, 7, 11, 13, 17, 19];
-        const xStart = 300;
-        const yStart = 350;
-        const tileSize = 40;
-        const spacing = 45;
-        
-        for (let i = 0; i < primes.length; i++) {
-            const x = xStart + (i % 4) * spacing;
-            const y = yStart + Math.floor(i / 4) * spacing;
-            
-            // Create tile
-            const tile = this.add.image(x, y, 'startTile')
-                .setDisplaySize(tileSize, tileSize);
-            
-            // Add number
-            this.add.text(x, y, primes[i].toString(), {
-                font: 'bold 16px Arial',
-                color: '#FFF',
-                stroke: '#000',
-                strokeThickness: 2
-            }).setOrigin(0.5);
-            
-            // // Add arrow if not last
-            // if (i < primes.length - 1) {
-            //     const nextX = xStart + ((i + 1) % 4) * spacing;
-            //     const nextY = yStart + Math.floor((i + 1) / 4) * spacing;
-                
-            //     this.add.line(x, y, 
-            //         tileSize/2 - 5, 0, 
-            //         spacing - tileSize/2 + 5, nextY - y, 
-            //         0xFFFFFF, 0.7)
-            //         .setOrigin(0);
-            // }
-        }
-    }
 }
 
 // Main game scene
@@ -184,6 +149,22 @@ class GameScene extends Phaser.Scene {
         this.tileSize = 80;
         this.isMoving = false;
         this.scoredTiles = new Set();
+
+        this.setupTouchControls()
+
+
+
+        // Update touch visual feedback
+        this.input.on('pointermove', (pointer) => {
+            if (!this.touchActive) return;
+
+            const dx = pointer.x - this.touchStartX;
+            const dy = pointer.y - this.touchStartY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+
+
+        });
 
 
         // Calculate center offset for the grid
@@ -345,7 +326,7 @@ class GameScene extends Phaser.Scene {
         });
 
         this.designSystem = {
-           
+
             typography: {
                 display: "'Playfair Display', serif", // Elegant serif
                 heading: "'Cormorant Garamond', serif", // Refined serif
@@ -387,10 +368,72 @@ class GameScene extends Phaser.Scene {
 
 
     }
-    update(time) {
-        if (this.isMoving || this.moveCooldown) return;
+    setupTouchControls() {
+        // Variables to track touch input
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.touchEndX = 0;
+        this.touchEndY = 0;
+        this.touchActive = false;
 
+        // Create a full-screen touch area
+        this.touchArea = this.add.rectangle(
+            this.cameras.main.centerX,
+            this.cameras.main.centerY,
+            this.cameras.main.width,
+            this.cameras.main.height,
+            0x000000,
+            0
+        ).setInteractive();
 
+        // Make sure the touch area is on top
+        this.touchArea.setDepth(1000);
+
+        // Touch event listeners
+        this.touchArea.on('pointerdown', (pointer) => {
+            this.touchStartX = pointer.x;
+            this.touchStartY = pointer.y;
+            this.touchActive = true;
+
+            // Show touch start position (for debugging)
+            console.log('Touch started at:', pointer.x, pointer.y);
+        });
+
+        this.touchArea.on('pointerup', (pointer) => {
+            if (!this.touchActive) return;
+            this.touchEndX = pointer.x;
+            this.touchEndY = pointer.y;
+            console.log('Touch ended at:', pointer.x, pointer.y);
+            this.handleSwipe();
+            this.touchActive = false;
+        });
+
+        // Handle case where touch leaves the game area
+        this.input.on('pointerup', () => {
+            if (this.touchActive) {
+                console.log('Touch cancelled');
+                this.touchActive = false;
+            }
+        });
+    }
+
+    handleSwipe() {
+        if (this.isMoving || this.moveCooldown) {
+            console.log('Movement blocked - isMoving:', this.isMoving, 'moveCooldown:', this.moveCooldown);
+            return;
+        }
+
+        const dx = this.touchEndX - this.touchStartX;
+        const dy = this.touchEndY - this.touchStartY;
+
+        console.log('Swipe detected - dx:', dx, 'dy:', dy);
+
+        // Only register swipes that move a significant distance
+        const minSwipeDistance = 30;
+        if (Math.abs(dx) < minSwipeDistance && Math.abs(dy) < minSwipeDistance) {
+            console.log('Swipe too short');
+            return;
+        }
 
         const lastPos = this.selectedPath.length > 0 ?
             this.selectedPath[this.selectedPath.length - 1] :
@@ -399,6 +442,50 @@ class GameScene extends Phaser.Scene {
         let targetX = lastPos.x;
         let targetY = lastPos.y;
 
+        if (Math.abs(dx) > Math.abs(dy)) {
+            // Horizontal swipe
+            if (dx > 0 && lastPos.x < this.gridSize - 1) {
+                targetX++;
+                console.log('Swiped right');
+            } else if (dx < 0 && lastPos.x > 0) {
+                targetX--;
+                console.log('Swiped left');
+            }
+        } else {
+            // Vertical swipe
+            if (dy > 0 && lastPos.y < this.gridSize - 1) {
+                targetY++;
+                console.log('Swiped down');
+            } else if (dy < 0 && lastPos.y > 0) {
+                targetY--;
+                console.log('Swiped up');
+            }
+        }
+
+        // If position changed, handle movement
+        if (targetX !== lastPos.x || targetY !== lastPos.y) {
+            console.log('Moving to:', targetX, targetY);
+            this.moveCooldown = true;
+            this.handleTileClick(targetX, targetY);
+
+            // Add slight delay before next move
+            this.time.delayedCall(200, () => {
+                this.moveCooldown = false;
+            });
+        } else {
+            console.log('No movement - same position or at edge');
+        }
+    }
+    update(time) {
+        if (this.isMoving || this.moveCooldown) return;
+        const lastPos = this.selectedPath.length > 0 ?
+            this.selectedPath[this.selectedPath.length - 1] :
+            { x: 0, y: 0 };
+
+        let targetX = lastPos.x;
+        let targetY = lastPos.y;
+
+        // Keep existing keyboard controls
         if (this.cursors.left.isDown && lastPos.x > 0) {
             targetX--;
         }
@@ -421,8 +508,8 @@ class GameScene extends Phaser.Scene {
             this.time.delayedCall(200, () => {
                 this.moveCooldown = false;
             });
-        }
 
+        }
         // Gentle wobble animation
         this.tiles.forEach(row => {
             row.forEach(tile => {
@@ -528,7 +615,7 @@ class GameScene extends Phaser.Scene {
             // Only add points if this tile hasn't been scored before
             if (!this.scoredTiles.has(tileKey)) {
                 const primeValue = tile.value;
-            
+
                 // const pointsEarned = this.calculatePoints(primeValue);
                 const pointsEarned = tile.value
                 this.score += pointsEarned;
@@ -714,7 +801,7 @@ class GameScene extends Phaser.Scene {
         if (isPrime) {
             // Show glow effect
             tileDef.glow.clear();
-            tileDef.glow.fillStyle( 0xfff9e6, 0.4);
+            tileDef.glow.fillStyle(0xfff9e6, 0.4);
             tileDef.glow.fillCircle(0, 0, this.tileSize / 2 + 4);
             tileDef.glow.alpha = 1;
 
@@ -773,7 +860,7 @@ class GameScene extends Phaser.Scene {
                 backgroundColor: '#fff0f0',
                 align: 'center',
                 padding: { x: 10, y: 10 },
-                
+
             }
         ).setOrigin(0.5);
 
@@ -871,7 +958,7 @@ class GameScene extends Phaser.Scene {
 
     celebrateWin() {
 
-        this.sound.play('win',{volume:0.8});
+        this.sound.play('win', { volume: 0.8 });
         // Create explosion of particles at treasure
         const winEmitter = this.particles.createEmitter({
             x: (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
@@ -898,8 +985,8 @@ class GameScene extends Phaser.Scene {
         this.treasureGlow.clear();
         this.treasureGlow.fillStyle(0xffff44, 0.8);
         this.treasureGlow.fillCircle(
-            (this.gridSize - 1) * this.tileSize + this.tileSize / 2+this.gridOffsetX,
-            (this.gridSize - 1) * this.tileSize + this.tileSize / 2+this.gridOffsetY,
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetX,
+            (this.gridSize - 1) * this.tileSize + this.tileSize / 2 + this.gridOffsetY,
             this.tileSize
         );
 
@@ -1071,7 +1158,7 @@ class WinScene extends Phaser.Scene {
             fontSize: '24px',
             color: '#FFFFFF',
             strokeThickness: 1
-           
+
         }).setOrigin(0.5);
 
         // New high score crown
@@ -1085,7 +1172,7 @@ class WinScene extends Phaser.Scene {
                 fontSize: '24px',
                 color: '#FF0000',
                 fontStyle: 'bold',
-               
+
             }).setOrigin(0.5);
 
             this.tweens.add({
@@ -1099,8 +1186,8 @@ class WinScene extends Phaser.Scene {
 
         // Play again button with treasure chest style
         const playAgainButton = this.add.rectangle(400, 460, 200, 60, 0xFA8072)
-        .setInteractive()
-        .setStrokeStyle(4, 0xFFFFFF);
+            .setInteractive()
+            .setStrokeStyle(4, 0xFFFFFF);
 
         const playAgainText = this.add.text(400, 460, 'PLAY AGAIN', {
             fontFamily: 'Georgia, serif',
@@ -1160,7 +1247,7 @@ class WinScene extends Phaser.Scene {
     createCelebration(x, y) {
         // Create particle emitter for celebration
         const particles = this.add.particles('particle');
-        
+
         const emitter = particles.createEmitter({
             x: x,
             y: y,
@@ -1186,8 +1273,17 @@ const config = {
     width: 800,
     height: 700,
     backgroundColor: '#1a1a2e',
-    scene: [StartScene,GameScene,WinScene],
-    parent: 'game-container'
+    scene: [StartScene, GameScene, WinScene],
+    parent: 'game-container',
+    input: {
+        activePointers: 3,
+        touch: {
+            capture: true
+        }
+    },
+    dom: {
+        createContainer: true
+    }
 };
 
 const game = new Phaser.Game(config);
