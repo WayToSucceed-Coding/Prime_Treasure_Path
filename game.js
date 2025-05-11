@@ -119,12 +119,12 @@ class LoadingScene extends Phaser.Scene {
                         this.tweens.add({
                             targets: this.readyText,
                             alpha: 1,
-                            scale: {from:1.3, to:1},
+                            scale: { from: 1.3, to: 1 },
                             duration: 500,
-                            ease:'Back.out',
+                            ease: 'Back.out',
                             onComplete: () => {
-                                    this.scene.start('GameScene');
-                                
+                                this.scene.start('GameScene');
+
                             }
                         })
 
@@ -1284,22 +1284,29 @@ class WinScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Score display on parchment
-        const scoreTitle = this.add.text(400, 290, `Your Score : ${this.score}`, {
+        const scoreTitle = this.add.text(350, 290, `Your Score : `, {
             fontFamily: 'Georgia, serif',
             fontSize: '40px',
             color: '#FFFFFF',
             strokeThickness: 1,
         }).setOrigin(0.5);
 
+        // Create the animated score text
+        this.scoreText = this.add.text(500, 290, '0', {
+            fontFamily: 'Georgia, serif',
+            fontSize: '40px',
+            color: '#FFFFFF',
+        }).setOrigin(0.5);
+
         // Animate score counting up
         let displayScore = 0;
         const scoreCountInterval = setInterval(() => {
             displayScore = Math.min(displayScore + Math.ceil(this.score / 20), this.score);
-            scoreText.setText(`${displayScore}`);
+            this.scoreText.setText(`${displayScore}`);
 
             if (displayScore >= this.score) {
                 clearInterval(scoreCountInterval);
-                this.createCelebration(scoreText.x, scoreText.y);
+                this.createCelebration(this.scoreText.x, this.scoreText.y);
             }
         }, 30);
 
@@ -1349,19 +1356,14 @@ class WinScene extends Phaser.Scene {
 
         // Button hover effects
         playAgainButton.on('pointerover', () => {
-            playAgainButton.clear()
-                .fillStyle(0xFF7F50, 1)
-                .fillRoundedRect(300, 430, 200, 60, 10)
-                .strokeRoundedRect(300, 430, 200, 60, 10);
+            playAgainButton.setFillStyle(0xFF7F50, 1)
+            
             playAgainText.setScale(1.05);
         });
 
         playAgainButton.on('pointerout', () => {
-            playAgainButton.clear()
-                .fillStyle(0xFA8072, 1)
-                .fillRoundedRect(300, 430, 200, 60, 10)
-                .setStrokeStyle(4, 0xFFD700)
-                .strokeRoundedRect(300, 430, 200, 60, 10);
+            playAgainButton.setFillStyle(0xFA8072, 1)
+           
             playAgainText.setScale(1);
         });
 
@@ -1403,17 +1405,15 @@ class WinScene extends Phaser.Scene {
             x: x,
             y: y,
             speed: { min: 50, max: 150 },
-            scale: { start: 0.3, end: 0 },
+            scale: { start: 0.5, end: 0 },
             alpha: { start: 0.8, end: 0 },
-            lifespan: 1500,
+            lifespan: 1000,
             blendMode: 'ADD',
             tint: [0xFFD700, 0xFFA500, 0xFFFFFF],
-            frequency: 50,
-            quantity: 5
         });
 
-        // Stop emitter after 3 seconds
-        this.time.delayedCall(3000, () => {
+        // Stop emitter 
+        this.time.delayedCall(500, () => {
             emitter.stop();
         });
     }
