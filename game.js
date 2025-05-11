@@ -1,4 +1,155 @@
-//Defines a new scene/screen in Phaser
+class LoadingScene extends Phaser.Scene {
+    constructor() {
+        super('LoadingScene');
+        this.minDisplayTime = 2500; // Minimum 2.5 seconds display time
+        this.startTime = 0;
+    }
+
+    preload() {
+        // Setup loading bar visuals
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+
+        // Background
+        this.add.rectangle(width / 2, height / 2, width, height, 0x1a1a2e);
+
+        // Progress bar container
+        const barWidth = width * 0.6;
+
+        // Actual progress bar
+        this.progressBar = this.add.rectangle(
+            width / 2 - barWidth / 2,
+            height / 2,
+            5, // Start with small width
+            30,
+            0xFA8072
+        ).setOrigin(0, 0.5);
+
+
+        // Percentage text
+        this.percentText = this.add.text(
+            width / 2,
+            height / 2,
+            '0%',
+            {
+                fontFamily: 'Arial',
+                fontSize: '18px',
+                color: '#FFFFFF'
+            }
+        ).setOrigin(0.5);
+
+        // Loading text with animation
+        this.loadingText = this.add.text(
+            width / 2,
+            height / 2 - 50,
+            'LOADING GAME....',
+            {
+                fontFamily: 'Georgia, serif',
+                fontSize: '32px',
+                color: '#FFFFFF'
+            }
+        ).setOrigin(0.5);
+
+        // "Let's Go!" text (initially hidden)
+        this.readyText = this.add.text(
+            width / 2,
+            height / 2 - 50,
+            'LET\'S GO!',
+            {
+                fontFamily: 'Georgia, serif',
+                fontSize: '42px',
+                color: '#ffffff',
+                shadow: {
+                    offsetX: 2,
+                    offsetY: 2,
+                    color: '#000',
+                    blur: 3,
+                    stroke: true
+                }
+            }
+        ).setOrigin(0.5).setAlpha(0);
+
+        // Animate loading text
+        this.tweens.add({
+            targets: this.loadingText,
+            scale: 1.05,
+            duration: 1000,
+            yoyo: true,
+            repeat: -1
+        });
+
+        // Load assets
+        this.loadAssets();
+
+        // Track loading progress
+        this.load.on('progress', (value) => {
+            // Update percentage text
+            this.percentText.setText(`${Math.floor(value * 100)}%`);
+
+            // Animate progress bar smoothly
+            this.tweens.add({
+                targets: this.progressBar,
+                width: barWidth * value,
+                duration: 300,
+                ease: 'Sine.Out'
+            });
+        });
+
+        this.load.on('complete', () => {
+            // Ensure minimum display time
+            const elapsed = this.time.now - this.startTime;
+            const remaining = Math.max(0, this.minDisplayTime - elapsed);
+
+            this.time.delayedCall(remaining, () => {
+                // Final animation before starting game
+                this.percentText.setText('100%');
+                this.progressBar.width = barWidth;
+
+                this.tweens.add({
+                    targets: [this.loadingText, this.messageText],
+                    alpha: 0,
+                    duration: 500
+                });
+
+                this.tweens.add({
+                    targets: [this.progressBar, this.percentText],
+                    alpha: 0,
+                    duration: 500,
+                    onComplete: () => {
+                        this.tweens.add({
+                            targets: this.readyText,
+                            alpha: 1,
+                            scale: {from:1.3, to:1},
+                            duration: 500,
+                            ease:'Back.out',
+                            onComplete: () => {
+                                    this.scene.start('GameScene');
+                                
+                            }
+                        })
+
+                    }
+                });
+            });
+        });
+    }
+
+    create() {
+        this.startTime = this.time.now;
+    }
+
+    loadAssets() {
+        // Load all game assets
+        this.load.image('waterTexture', 'assets/texture5.png');
+        this.load.image('tile', 'assets/stone2.png');
+        this.load.image('explorer', 'assets/player.png');
+        this.load.image('treasure', 'assets/gem.png');
+        this.load.image('particle', 'assets/gem.png');
+        this.load.audio('collect', 'assets/pop.mp3');
+        this.load.audio('error', 'assets/error.mp3');
+        this.load.audio('win', 'assets/win.mp3');
+    }
+}//Defines a new scene/screen in Phaser
 class StartScene extends Phaser.Scene {
     constructor() {
         super('StartScene');
@@ -77,9 +228,9 @@ class StartScene extends Phaser.Scene {
             playText.setScale(1);
         });
 
-        // Start game on click
+        // Load game on click
         playButton.on('pointerdown', () => {
-            this.scene.start('GameScene');
+            this.scene.start('LoadingScene');  // New version
         });
 
         // Add explorer character
@@ -1273,7 +1424,7 @@ const config = {
     width: 800,
     height: 700,
     backgroundColor: '#1a1a2e',
-    scene: [StartScene, GameScene, WinScene],
+    scene: [StartScene, LoadingScene, GameScene, WinScene],
     parent: 'game-container',
     input: {
         activePointers: 3,
