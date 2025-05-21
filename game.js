@@ -194,12 +194,13 @@ class StartScene extends Phaser.Scene {
         // Game explanation
         const explanation = this.add.text(400, 300,
             `Reach the treasure by following a path where each step is a prime number.\n` +
-            `Use arrow keys to move.\n Make sure to avoid non-prime numbers!\n`,
+            `Use arrow keys or SWIPE to move.\n Make sure to avoid non-prime numbers!\n`,
             {
                 fontFamily: 'Arial',
                 fontSize: '18px',
                 color: '#EEE',
                 align: 'center',
+                fontStyle:'bold',
                 lineSpacing: 10
             }).setOrigin(0.5);
 
@@ -282,6 +283,7 @@ class GameScene extends Phaser.Scene {
     preload() {
         // Load assets with enhanced visuals
         this.load.image('waterTexture', 'assets/texture5.png');
+        this.load.image('hand', 'assets/hand.png');
         this.load.image('tile', 'assets/stone2.png');
         this.load.image('explorer', 'assets/player.png');
         this.load.image('treasure', 'assets/gem.png');
@@ -303,7 +305,10 @@ class GameScene extends Phaser.Scene {
 
         this.setupTouchControls()
 
-
+        if (this.sys.game.device.input.touch) {
+            this.showSwipeTutorial();
+            //localStorage.setItem('swipeTutorialShown', 'true');
+        }
 
         // Update touch visual feedback
         this.input.on('pointermove', (pointer) => {
@@ -515,10 +520,281 @@ class GameScene extends Phaser.Scene {
             .setOrigin(0)
             .setDepth(-1);
 
-
-
-
     }
+
+    showSwipeTutorial() {
+        // Create tutorial container
+        const tutorial = this.add.container(0, 0).setDepth(1000);
+
+        // Semi-transparent overlay
+        const overlay = this.add.rectangle(
+            0, 0,
+            this.cameras.main.width,
+            this.cameras.main.height,
+            0x000000, 0.7
+        ).setOrigin(0).setInteractive();
+        tutorial.add(overlay);
+
+        // Instruction text
+        const tutorialText = this.add.text(
+            this.cameras.main.centerX,
+            50,
+            'LEARN HOW TO PLAY',
+            {
+                fontFamily: 'Georgia, serif',
+                fontSize: '24px',
+                fontStyle:'bold',
+                color: '#FFFFFF',
+                align: 'center',
+                wordWrap: { width: 600 }
+            }
+        ).setOrigin(0.5);
+        tutorial.add(tutorialText);
+
+        // Create mini 4x4 grid for better demonstration
+        const demoGrid = [
+            [5, 4, 7, 12],  // Row 1
+            [2, 11, 8, 13],  // Row 2
+            [3, 59, 17, 10],  // Row 3
+            [19, 9, 23, 29]   // Row 4 (29 is treasure)
+        ];
+
+        // Create game elements
+        const demoElements = this.createDemoBoard(demoGrid, tutorial);
+
+        // Create hand sprite
+        const hand = this.add.sprite(
+            demoElements.tiles[0][0].container.x,
+            demoElements.tiles[0][0].container.y + 200,
+            'hand'
+        ).setScale(0.1);
+        tutorial.add(hand);
+
+        // Animation sequence: mix of correct and incorrect moves
+        const demoSequence = [
+            // Correct moves
+            { x: 0, y: 0, correct: true, text: "SWIPE to move to prime number" }, // Start at 5
+            { x: 1, y: 0, correct: false, text: "Oops! 4 is not prime. Back to start" }, // Incorrect right to 4
+            { x: 0, y: 0, correct: true, text: "Let's try SWIPE DOWN to 2" }, // Reset
+            { x: 0, y: 1, correct: true, text: "Good! 2 is prime" }, // Correct down to 2
+            { x: 1, y: 1, correct: true, text: "SWIPE RIGHT to 11" }, // Right to 11
+            { x: 1, y: 2, correct: true, text: "Now SWIPE DOWN to 59" },
+            { x: 2, y: 2, correct: true, text: "SWIPE RIGHT to 17" },
+            { x: 2, y: 3, correct: true, text: "SWIPE DOWN to 23" },
+            { x: 3, y: 3, correct: true, text: "SWIPE RIGHT to collect Treasure" } // Treasure
+        ];
+
+        // Add skip button (top right corner)
+        const skipButton = this.add.text(
+            this.cameras.main.width - 20,
+            20,
+            'SKIP',
+            {
+                fontFamily: 'Arial',
+                fontSize: '24px',
+                color: '#FFFFFF',
+                backgroundColor: '#00000066',
+                padding: { x: 10, y: 5 }
+            }
+        )
+            .setOrigin(1, 0)
+            .setInteractive()
+            .on('pointerdown', () => {
+                if(this.winParticles){
+                    this.winParticles.destroy()
+                }
+                tutorial.destroy()    
+                this.isTutorialActive=false   
+            });
+
+        tutorial.add(skipButton)
+
+        this.winParticles=null;
+        this.isTutorialActive=true;
+
+        // Start animation
+        this.runTutorialSequence(tutorial, demoElements, hand, tutorialText, demoSequence);
+    }
+
+    runTutorialSequence(tutorial, elements, hand, tutorialText, sequence) {
+        let step = 0;
+        let currentPos = { x: 0, y: 0 };
+
+        const nextStep = () => {
+
+             if (!this.isTutorialActive) return;
+             
+            if (step >= sequence.length) {
+                // Final celebration
+                tutorialText.setText('GREAT! YOU REACHED THE TREASURE\nTAP TO BEGIN');
+
+                // Treasure celebration
+                this.tweens.add({
+                    targets: elements.treasure,
+                    scale: 1.3,
+                    duration: 300,
+                    yoyo: true,
+                    repeat: 3
+                });
+
+                // Particles
+                this.winParticles = this.add.particles('particle');
+                this.winParticles.createEmitter({
+                    x: elements.treasure.x,
+                    y: elements.treasure.y,
+                    speed: 100,
+                    scale: { start: 0.3, end: 0 },
+                    blendMode: 'ADD',
+                    quantity: 20,
+                    lifespan: 1000
+                });
+
+                // Click to dismiss
+                tutorial.list[0].on('pointerdown', () => {
+                    particles.destroy()
+                    tutorial.destroy()
+                });
+                return;
+            }
+
+            const move = sequence[step];
+            const nextTile = elements.tiles[move.y][move.x];
+
+            // Update instruction text
+            tutorialText.setText(move.text);
+
+            // Animate hand swipe
+            this.tweens.add({
+                targets: hand,
+                x: nextTile.container.x,
+                y: nextTile.container.y + 80,
+                duration: 200,
+                ease: 'Power2',
+                onComplete: () => {
+                    // Move player
+                    this.tweens.add({
+                        targets: elements.player,
+                        x: nextTile.container.x,
+                        y: nextTile.container.y,
+                        duration: 200,
+                        ease: 'Power2',
+                        onComplete: () => {
+                            if (move.correct) {
+                                // Correct move - highlight path
+                                elements.tiles[currentPos.y][currentPos.x].tile.setTint(0x88ff88);
+                                nextTile.tile.setTint(0xccffcc);
+                                currentPos = { x: move.x, y: move.y };
+                                step++;
+                                this.time.delayedCall(1000, nextStep);
+                            } else {
+                                // Incorrect move - reset to start
+                                tutorialText.setText(move.text + "\n(Wrong move - resetting)");
+
+                                // Flash red on wrong tile
+                                this.tweens.add({
+                                    targets: nextTile.tile,
+                                    tint: 0xff0000,
+                                    duration: 300,
+                                    yoyo: true
+                                });
+
+                                // Reset player to start after delay
+                                this.time.delayedCall(500, () => {
+                                    this.tweens.add({
+                                        targets: elements.player,
+                                        x: elements.tiles[0][0].container.x,
+                                        y: elements.tiles[0][0].container.y,
+                                        duration: 600,
+                                        onComplete: () => {
+                                            // Reset all highlights
+                                            elements.tiles.forEach(row => {
+                                                row.forEach(t => {
+                                                    t.tile.clearTint();
+                                                });
+                                            });
+                                            currentPos = { x: 0, y: 0 };
+                                            step++;
+                                            this.time.delayedCall(800, nextStep);
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                    });
+                }
+            });
+        };
+
+        // Start animation
+        nextStep();
+    }
+
+    createDemoBoard(grid, tutorial) {
+        const tileSize = 80;
+        const startX = this.cameras.main.centerX - (grid[0].length * tileSize) / 2;
+        const startY = this.cameras.main.centerY - 50;
+
+        const elements = {
+            tiles: [],
+            player: null,
+            treasure: null
+        };
+
+        // Create tiles
+        for (let y = 0; y < grid.length; y++) {
+            elements.tiles[y] = [];
+            for (let x = 0; x < grid[y].length; x++) {
+                const value = grid[y][x];
+                const isPrime = this.isPrime(value);
+                const isTreasure = (x === grid[y].length - 1 && y === grid.length - 1);
+
+                // Create container
+                const container = this.add.container(
+                    startX + x * tileSize + tileSize / 2,
+                    startY + y * tileSize + tileSize / 2
+                );
+                tutorial.add(container);
+
+                // Create tile
+                const tile = this.add.image(0, 0, 'tile')
+                    .setDisplaySize(tileSize - 4, tileSize - 4);
+
+                container.add(tile);
+
+                // Create number text
+                const text = this.add.text(0, 0, value.toString(), {
+                    font: 'bold 20px Arial',
+                    fill: '#FFFFFF'
+                }).setOrigin(0.5);
+                container.add(text);
+
+                // Create treasure if end position
+                if (isTreasure) {
+                    elements.treasure = this.add.image(
+                        container.x,
+                        container.y,
+                        'treasure'
+                    ).setDisplaySize(50, 50);
+                    tutorial.add(elements.treasure);
+                }
+
+                elements.tiles[y][x] = { container, tile, text, value, isPrime };
+            }
+        }
+
+        // Create player at start position
+        elements.player = this.add.sprite(
+            elements.tiles[0][0].container.x,
+            elements.tiles[0][0].container.y,
+            'explorer'
+        ).setDisplaySize(60, 60);
+        tutorial.add(elements.player);
+
+        return elements;
+    }
+
+
+
     setupTouchControls() {
         // Variables to track touch input
         this.touchStartX = 0;
@@ -1283,6 +1559,31 @@ class WinScene extends Phaser.Scene {
             }
         }).setOrigin(0.5);
 
+        // Add control hint for mobile
+        if (this.sys.game.device.input.touch) {
+            this.controlHint = this.add.text(
+                this.cameras.main.centerX,
+                50,
+                'SWIPE to move',
+                {
+                    fontFamily: 'Arial',
+                    fontSize: '18px',
+                    color: '#FFFFFF',
+                    backgroundColor: '#00000066',
+                    padding: { x: 10, y: 5 }
+                }
+            ).setOrigin(0.5);
+
+            // Make it pulse gently
+            this.tweens.add({
+                targets: this.controlHint,
+                alpha: 0.7,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1
+            });
+        }
+
         // Score display on parchment
         const scoreTitle = this.add.text(350, 290, `Your Score : `, {
             fontFamily: 'Georgia, serif',
@@ -1357,13 +1658,13 @@ class WinScene extends Phaser.Scene {
         // Button hover effects
         playAgainButton.on('pointerover', () => {
             playAgainButton.setFillStyle(0xFF7F50, 1)
-            
+
             playAgainText.setScale(1.05);
         });
 
         playAgainButton.on('pointerout', () => {
             playAgainButton.setFillStyle(0xFA8072, 1)
-           
+
             playAgainText.setScale(1);
         });
 
